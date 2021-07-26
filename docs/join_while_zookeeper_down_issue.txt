@@ -1,4 +1,6 @@
 
+* Note: issue is resolved by CURATOR-599 Jira issue at Curator 5.2.0.
+
 While testing ClusterControllerReconnectTest multiple times, on some executions where ZooKeeper is not available while
 joining cluster, it got waiting and hanging indefinitely, with thread dump stack trace which can be seen
 below.

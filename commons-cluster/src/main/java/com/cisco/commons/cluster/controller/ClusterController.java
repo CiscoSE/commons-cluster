@@ -3,12 +3,10 @@ package com.cisco.commons.cluster.controller;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -34,6 +32,7 @@ import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.Watcher.Event.EventType;
 import org.apache.zookeeper.Watcher.Event.KeeperState;
+import org.apache.zookeeper.client.ZKClientConfig;
 import org.apache.zookeeper.data.Stat;
 
 import lombok.AccessLevel;
@@ -85,6 +84,9 @@ public class ClusterController {
     @NonNull @Getter @Setter(AccessLevel.PROTECTED)
     private String zkPort;
     
+    @Getter @Setter(AccessLevel.PROTECTED)
+    private int zookeeperRequestTimeoutSeconds = 30;
+    
     @NonNull @Getter @Setter(AccessLevel.PROTECTED)
     private Integer expectedNumberOfInstances;
     
@@ -109,14 +111,13 @@ public class ClusterController {
     private AtomicBoolean alreadyShutDown = new AtomicBoolean();
     private List<String> instanceNames;
     private ExecutorService leaderListenerPool;
-    private ExecutorService initPool;
     private AtomicBoolean shouldRun = new AtomicBoolean(true);
     private JsonInstanceSerializer<InstanceMessage> serializer;
     private ClusterEventScheduler eventScheduler;
     private ExecutorService messagesPool;
 
     @Builder
-    private ClusterController(ClusterEventListener eventListener, String appId, int expectedNumberOfInstances, boolean isUseGracePeriod, String zkHost, String zkPort, String host) {
+    private ClusterController(ClusterEventListener eventListener, String appId, int expectedNumberOfInstances, boolean isUseGracePeriod, String zkHost, String zkPort, String host, int zookeeperRequestTimeoutSeconds) {
         log.info("init");
         this.eventListener = eventListener;
         this.appId = appId;
@@ -124,6 +125,7 @@ public class ClusterController {
         this.isUseGracePeriod = isUseGracePeriod;
         this.zkHost = zkHost;
         this.zkPort = zkPort;
+        this.zookeeperRequestTimeoutSeconds = zookeeperRequestTimeoutSeconds;
     }
     
     protected ClusterController() {
@@ -151,34 +153,14 @@ public class ClusterController {
         String zkConnectString = zkHost + ":" + zkPort;
         log.info("Connecting ZooKeeer url: {}", zkConnectString);
         log.info("clusterJoinTask begin");
-        initPool = Executors.newSingleThreadExecutor();
         AtomicBoolean success = new AtomicBoolean(false);
         while (shouldRun.get() && !success.get()) {
             try {
-            	
-            	/*
-            	 * It needs to be executed in a separate thread in order to interrupt it if it hangs.
-            	 * From testing multiple times, on some executions where ZooKeeper is not available while
-            	 * joining cluster, it got waiting and hanging indefinitely, probably due to a race condition.
-            	 * For more details, see ClusterControllerReconnectTest and
-            	 * docs/join_while_zookeeper_down_issue.txt
-            	 */
-                Callable<Boolean> joinClusterTask = () -> {
-                	try {
-                		log.info("Joining cluster.");
-						joinClusterHelper(retryPolicy, zkConnectString);
-						log.info("Joining cluster succeed.");
-						success.set(true);
-						return true;
-                	} catch (Exception e) {
-                        log.error("Error joining cluster task: " + e.getMessage(), e);
-                        return false;
-                    }
-                };
+            	log.info("Joining cluster.");
+				joinClusterHelper(retryPolicy, zkConnectString);
+				log.info("Joining cluster succeed.");
+				success.set(true);
                 log.info("Executing join cluster task.");
-				initPool.invokeAll(Arrays.asList(joinClusterTask), 30, TimeUnit.SECONDS);
-				initPool.shutdownNow();
-				initPool.awaitTermination(30, TimeUnit.SECONDS);
 				log.info("Join cluster task done.");
             } catch (Exception e) {
                 log.error("Error joining cluster: " + e.getMessage(), e);
@@ -194,7 +176,12 @@ public class ClusterController {
 			throws Exception, InterruptedException {
 		messagesPool = Executors.newFixedThreadPool(4);
         leaderListenerPool = Executors.newSingleThreadExecutor();
-		client = CuratorFrameworkFactory.newClient(zkConnectString, 60000, 30000, retryPolicy);
+        ZKClientConfig zkClientConfig = new ZKClientConfig();
+		String zookeeperRequestTimeoutStr = String.valueOf(TimeUnit.SECONDS.toMillis(zookeeperRequestTimeoutSeconds));
+		log.info("Set {} to: {}.", ZKClientConfig.ZOOKEEPER_REQUEST_TIMEOUT, zookeeperRequestTimeoutStr);
+		zkClientConfig.setProperty(ZKClientConfig.ZOOKEEPER_REQUEST_TIMEOUT, zookeeperRequestTimeoutStr);
+		client = CuratorFrameworkFactory.newClient(zkConnectString, 60000, 30000, retryPolicy, zkClientConfig);
+		
         client.start();
         serializer = new JsonInstanceSerializer<InstanceMessage>(InstanceMessage.class);
         InstanceMessage instanceDetails = new InstanceMessage();
@@ -467,9 +454,6 @@ public class ClusterController {
         try {
             log.info("Shutting down {}", host);
             shouldRun.set(false);
-            if (initPool != null) {
-                initPool.shutdownNow();
-            }
             close();
             log.info("Shut down {}", host);
         } catch (Exception e) {
