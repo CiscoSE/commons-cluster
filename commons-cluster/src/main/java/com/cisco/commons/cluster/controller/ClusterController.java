@@ -12,6 +12,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.commons.lang3.time.StopWatch;
 import org.apache.curator.RetryPolicy;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
@@ -242,7 +243,16 @@ public class ClusterController {
                     eventScheduler = createEventScheduler();
                     instanceNames = getSortedInstances();
                     log.info("Triggering eventListener takeLeadership");
+                    StopWatch stopWatch = new StopWatch();
+                    stopWatch.start();
                     eventListener.takeLeadership();
+                    stopWatch.stop();
+                    long timeTakenMillis = stopWatch.getTime();
+                    log.info("takeLeadership time taken: {} ms.", timeTakenMillis);
+					long timeTakenSeconds = TimeUnit.MILLISECONDS.toSeconds(timeTakenMillis);
+                    if (timeTakenSeconds >= 30) {
+                    	log.warn("Slow consumer, takeLeadership time taken: {} seconds.", timeTakenSeconds);
+                    }
                 } catch (Exception e) {
                     log.error("Error on starting cache: " + e.getMessage(), e);
                 }
@@ -262,7 +272,15 @@ public class ClusterController {
                     eventScheduler.shutdown();
                 }
                 log.info("Triggering eventListener leadershipLost");
+                StopWatch stopWatch = new StopWatch();
+                stopWatch.start();
                 eventListener.leadershipLost();
+                long timeTakenMillis = stopWatch.getTime();
+                log.info("leadershipLost time taken: {} ms.", timeTakenMillis);
+				long timeTakenSeconds = TimeUnit.MILLISECONDS.toSeconds(timeTakenMillis);
+                if (timeTakenSeconds >= 30) {
+                	log.warn("Slow consumer, leadershipLost time taken: {} seconds.", timeTakenSeconds);
+                }
             }
         };
     }
