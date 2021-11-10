@@ -43,8 +43,4 @@ public interface ClusterService {
     
     public void deleteAllKVs(String prefix) throws Exception;
 
-    public boolean checkConnectivity();
-
-    public void reconnect(String password);
-
 }
