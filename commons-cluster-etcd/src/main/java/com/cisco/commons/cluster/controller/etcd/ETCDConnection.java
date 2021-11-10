@@ -8,6 +8,7 @@ import io.etcd.jetcd.Client;
 import io.etcd.jetcd.ClientBuilder;
 import io.etcd.jetcd.KV;
 import io.etcd.jetcd.Lease;
+import io.etcd.jetcd.Watch;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -40,6 +41,9 @@ public class ETCDConnection {
 	@Getter
 	private Lease leaseClient;
 	
+	@Getter
+	private Watch watchClient;
+	
 	@Builder
     private ETCDConnection(Collection<String> endpoints, long connectTimeoutSeconds, String etcdUser, Supplier<String> etcPasswordSupplier) {
         log.info("constructing");
@@ -67,6 +71,7 @@ public class ETCDConnection {
 		client = clientBuilder.build();
         kvClient = client.getKVClient();
         leaseClient = client.getLeaseClient();
+        watchClient = client.getWatchClient();
         
         // TODO periodic check status and reconnect if needed
         
@@ -78,7 +83,6 @@ public class ETCDConnection {
 			ETCDUtils.get(TEST_HEALTH_KEY, kvClient, 3);
 			return true;
 		} catch (Exception e) {
-			log.error("Error checkConnectivityAndUpdateStatus: " + e.getMessage(), e);
 			return false;
 		}
 	}

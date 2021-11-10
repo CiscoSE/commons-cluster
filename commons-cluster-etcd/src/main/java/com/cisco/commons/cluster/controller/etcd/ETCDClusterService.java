@@ -26,7 +26,6 @@ import io.etcd.jetcd.lease.LeaseKeepAliveResponse;
 import io.etcd.jetcd.options.DeleteOption;
 import io.etcd.jetcd.options.GetOption;
 import io.etcd.jetcd.options.PutOption;
-import io.grpc.stub.StreamObserver;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -63,7 +62,7 @@ public class ETCDClusterService implements ClusterService {
     }
 	
 	@Override
-	public void init(String password) {
+	public void init() {
 		
 		// TODO add condition alreadyinit
 		
@@ -74,30 +73,16 @@ public class ETCDClusterService implements ClusterService {
         
 //        connectivityCheckPool.schedule(callable, delay, unit)
 	}
-
-	// TODO move methods to util class
 	
 	@Override
 	public String get(String key) throws Exception {
-		ByteSequence keyByteSequence = from(key);
-        CompletableFuture<GetResponse> getFuture = etcdConnection.getKvClient().get(keyByteSequence);
-        GetResponse response = getFuture.get(requestTimeoutSeconds, TimeUnit.SECONDS);
-        List<KeyValue> kvs = response.getKvs();
-        if (kvs.size() > 1) {
-            log.error("Multiple values found for key: " + key);
-        }
-        String value = null;
-        for (KeyValue keyValue : kvs) {
-            value = keyValue.getValue().toString(CHARSET);
-            break;
-        }
-        return value;
+		return ETCDUtils.get(key, etcdConnection.getKvClient(), requestTimeoutSeconds);
 	}
 
 	@Override
 	public String put(String key, String value) throws Exception {
-		ByteSequence keyByteSequence = from(key);
-        ByteSequence valueByteSequence = from(value);
+		ByteSequence keyByteSequence = ETCDUtils.from(key);
+        ByteSequence valueByteSequence = ETCDUtils.from(value);
         CompletableFuture<PutResponse> putResponseFuture = etcdConnection.getKvClient().put(keyByteSequence, valueByteSequence);
         return getPrevValue(putResponseFuture);
 	}
@@ -114,17 +99,16 @@ public class ETCDClusterService implements ClusterService {
         }
         return prevValue;
 	}
-
-	private ByteSequence from(String key) {
-		return ByteSequence.from(key, CHARSET);
-	}
 	
 	@Override
 	public String put(String key, String value, long ttlSeconds) throws Exception {
 		long leaseID = etcdConnection.getLeaseClient().grant(ttlSeconds).get().getID();
 		keyToLeaseId.put(key, leaseID);
-		ByteSequence keyByteSequence = from(key);
-		ByteSequence valueByteSequence = from(key);
+		
+		// TODO remove from keyToLeaseId when expires via expire watch
+		
+		ByteSequence keyByteSequence = ETCDUtils.from(key);
+		ByteSequence valueByteSequence = ETCDUtils.from(key);
 		CompletableFuture<PutResponse> putResponseFuture = etcdConnection.getKvClient().put(keyByteSequence, valueByteSequence, 
 			PutOption.newBuilder().withLeaseId(leaseID).build());
 		return getPrevValue(putResponseFuture);
@@ -140,39 +124,18 @@ public class ETCDClusterService implements ClusterService {
 		if (leaseId == null) { 
 			throw new IOException("Key lease not found for key: " + key);
 		}
-		StreamObserver<LeaseKeepAliveResponse> observer = new StreamObserver<LeaseKeepAliveResponse>() {
-
-			@Override
-			public void onNext(LeaseKeepAliveResponse value) {
-				// TODO Auto-generated method stub
-				
-			}
-
-			@Override
-			public void onError(Throwable e) {
-				log.error("Error onError: " + e.getClass() + ", " + e.getMessage(), e);
-			}
-
-			@Override
-			public void onCompleted() {
-				// TODO Auto-generated method stub
-				
-			}
-		};
+		
 		CompletableFuture<LeaseKeepAliveResponse> LeaseKeepAliveResponseFuture = etcdConnection.getLeaseClient().keepAliveOnce(leaseId);
 		LeaseKeepAliveResponse leaseKeepAliveResponse = LeaseKeepAliveResponseFuture.get(requestTimeoutSeconds, TimeUnit.SECONDS);
 		if (leaseKeepAliveResponse == null) {
 			throw new IOException("Keepalive did not succeed for key: " + key);
 		}
-//		leaseClient.keepAlive(leaseId, observer );
-		
-		// TODO remove from keyToLeaseId when expires
 		
 	}
 
 	@Override
 	public String remove(String key) throws Exception {
-		ByteSequence keyByteSequence = from(key);
+		ByteSequence keyByteSequence = ETCDUtils.from(key);
         CompletableFuture<DeleteResponse> deleteResponseFuture = etcdConnection.getKvClient().delete(keyByteSequence);
         DeleteResponse deleteResponse = deleteResponseFuture.get(requestTimeoutSeconds, TimeUnit.SECONDS);
         String prevValue = null;
@@ -194,11 +157,13 @@ public class ETCDClusterService implements ClusterService {
 	public void addListener(PersistencyListener persistencyListener, String prefix) {
 		// TODO Auto-generated method stub
 		
+		// TODO include expired keys
+		
 	}
 
 	@Override
 	public Collection<String> getAllKeys(String prefix) throws Exception {
-		ByteSequence keysPrefixByteSequence = from(prefix);
+		ByteSequence keysPrefixByteSequence = ETCDUtils.from(prefix);
         GetOption getOption = GetOption.newBuilder().isPrefix(true).build();
         CompletableFuture<GetResponse> getFuture = etcdConnection.getKvClient().get(keysPrefixByteSequence, getOption);
         GetResponse response = getFuture.get(requestTimeoutSeconds, TimeUnit.SECONDS);
@@ -237,6 +202,7 @@ public class ETCDClusterService implements ClusterService {
         log.info("Deleted kvs: {}", kvs);
 	}
 	
+	@Override
     public void close() {
         log.info("close");
 //        shouldRun.set(false);

@@ -76,8 +76,8 @@ public class MemoryClusterService implements ClusterService {
 	}
 	
 	@Override
-	public String put(String key, String value, long duration, TimeUnit timeUnit) throws IOException {
-		String oldValue = map.put(key, value, ExpirationPolicy.CREATED, duration, timeUnit);
+	public String put(String key, String value, long ttlSeconds) throws IOException {
+		String oldValue = map.put(key, value, ExpirationPolicy.CREATED, ttlSeconds, TimeUnit.SECONDS);
 		triggerEvent(key, oldValue, value, EventType.CREATED);
 		return oldValue;
 	}
@@ -136,6 +136,11 @@ public class MemoryClusterService implements ClusterService {
 		for (String key: keys) {
 			map.remove(key);
 		}
+	}
+	
+	@Override
+	public void close() {
+		
 	}
 
 }

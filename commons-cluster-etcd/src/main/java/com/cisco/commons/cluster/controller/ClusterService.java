@@ -7,7 +7,7 @@ import java.util.Map;
 
 public interface ClusterService {
 
-	public void init(String password);
+	public void init();
 	
     public String get(String key) throws Exception;
 
@@ -42,5 +42,7 @@ public interface ClusterService {
     public Map<String, String> getAllKeyValues(String prefix) throws Exception;
     
     public void deleteAllKVs(String prefix) throws Exception;
+
+    public void close();
 
 }

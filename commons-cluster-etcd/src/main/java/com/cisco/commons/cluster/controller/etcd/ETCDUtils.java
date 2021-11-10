@@ -26,6 +26,10 @@ public class ETCDUtils {
 		
 	}
 	
+	public static ByteSequence from(String key) {
+		return ByteSequence.from(key, CHARSET);
+	}
+	
 	public static String get(String key, KV kvClient, long requestTimeoutSeconds) throws Exception {
 		ByteSequence keyByteSequence = from(key);
         CompletableFuture<GetResponse> getFuture = kvClient.get(keyByteSequence);
@@ -40,9 +44,5 @@ public class ETCDUtils {
             break;
         }
         return value;
-	}
-	
-	public static ByteSequence from(String key) {
-		return ByteSequence.from(key, CHARSET);
 	}
 }
