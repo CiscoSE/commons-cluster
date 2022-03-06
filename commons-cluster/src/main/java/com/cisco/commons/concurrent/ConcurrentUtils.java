@@ -1,11 +1,18 @@
 package com.cisco.commons.concurrent;
 
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+import org.apache.commons.lang3.time.StopWatch;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -77,5 +84,43 @@ public class ConcurrentUtils {
 		stats.put(label + ".pool.tasks.count", String.valueOf(threadPoolExecutor.getTaskCount()));
 		stats.put(label + ".pool.queue.size", String.valueOf(threadPoolExecutor.getQueue().size()));
 		return Collections.unmodifiableMap(stats);
+	}
+	
+	/**
+	 * Wait for all tasks to finish up to the timeout.
+	 * @param futures tasks
+	 * @param timeoutMillis timeout in milliseconds
+	 * @return true if all succeed in time, false otherwise.
+	 * @throws InterruptedException if interrupted
+	 * @throws ExecutionException if got execution exception
+	 */
+	public static boolean waitForFinish(List<Future<Boolean>> futures, long timeoutMillis) throws InterruptedException, ExecutionException {
+		boolean isTimeoutReached = false;
+		Iterator<Future<Boolean>> nonMandatoryTasksFuturesIterator = futures.iterator();
+		StopWatch stopWatch = new StopWatch("waitForFinish");
+		stopWatch.start();
+		boolean allSucceed = true;
+		while (!isTimeoutReached && nonMandatoryTasksFuturesIterator.hasNext()) {
+			Future<Boolean> nonMandatoryTasksFuture = nonMandatoryTasksFuturesIterator.next();
+			try {
+				long elapsedTime = stopWatch.getTime();
+				if (elapsedTime > timeoutMillis) {
+					log.info("elapsedTime is more than grace period");
+					isTimeoutReached = true;
+					allSucceed = false;
+					break;
+				}
+				boolean result = nonMandatoryTasksFuture.get(timeoutMillis - elapsedTime, TimeUnit.MILLISECONDS);
+				if (!result) {
+					allSucceed = false;
+				}
+			} catch (TimeoutException e) {
+				isTimeoutReached = true;
+				allSucceed = false;
+			}
+		}
+		stopWatch.stop();
+		log.info("waitForFinish done. allSucceed: {}, isTimeoutReached: {}, elapsedTime: {}", allSucceed, isTimeoutReached, stopWatch.getTime());
+		return allSucceed;
 	}
 }

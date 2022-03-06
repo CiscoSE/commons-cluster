@@ -145,7 +145,7 @@ This can be very useful for distributed services, to meet several requirements:
 	* in a background task for not holding service startup.
 	* Retry mechanism – per component, not for all components together.
  * Circuit breaker for retrying for waiting for some cluster state which can hold service initialization.
- * Optional non-mandatory comonents can be retried and initialized in a background task without holding
+ * Optional non-mandatory components can be retried and initialized in a background task without holding
    application from starting and serving requests and/or do its work.
 	* Serve requests and/or do the work only after all mandatory components initialization tasks are done.
 

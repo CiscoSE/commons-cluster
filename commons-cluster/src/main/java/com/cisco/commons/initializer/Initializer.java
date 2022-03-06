@@ -161,17 +161,17 @@ public class Initializer {
 		    nonMandatoryInitTasks.add(initTask);
 		}
 		log.info("Invoking non mandatory init tasks.");
+		for (Callable<Boolean> nonMandatoryInitTask: nonMandatoryInitTasks) {
+			Future<Boolean> future = initTasksPool.submit(nonMandatoryInitTask);
+			nonMandatoryTasksFutures.add(future);
+		}
 		if (postInitGracePeriodSeconds != null && postInitGracePeriodSeconds > 0 && 
 				!nonMandatoryTasks.isEmpty()) {
 			log.info("Delaying for grace period of {} seconds before proceeding to post init tasks.", postInitGracePeriodSeconds);
-			nonMandatoryTasksFutures = initTasksPool.invokeAll(nonMandatoryInitTasks, postInitGracePeriodSeconds, TimeUnit.SECONDS);
+			long postInitGracePeriodMillis = postInitGracePeriodSeconds * 1000l;
+			boolean allSucceed = ConcurrentUtils.waitForFinish(nonMandatoryTasksFutures, postInitGracePeriodMillis);
+			log.info("Done waiting for non mandatory init tasks for grace period, proceeding to post init tasks. allSucceed: {}", allSucceed);
 			log.info("Invoked non mandatory init tasks.");
-		} else {
-			for (Callable<Boolean> nonMandatoryInitTask: nonMandatoryInitTasks) {
-				Future<Boolean> future = initTasksPool.submit(nonMandatoryInitTask);
-				nonMandatoryTasksFutures.add(future);
-			}
-			log.info("Invoked non mandatory init tasks in background.");
 		}
 		log.info("Invoking post init tasks.");
 		Set<Entry<String, Callable<Boolean>>> postInitTasksEntries = postInitTasks.entrySet();
@@ -226,7 +226,7 @@ public class Initializer {
     	log.info("Executing action - begin: {}", actionLabel);
     	boolean success = false;
     	while (!success && shouldRun.get()) {
-    		if (!circuitBreaker.isOpen()) {
+    		if (circuitBreaker == null || !circuitBreaker.isOpen()) {
 	    		try {
 	    			log.info("Executing action - attempt: {}", actionLabel);
 	                Boolean result = action.call();
