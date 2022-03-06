@@ -31,6 +31,7 @@ import lombok.extern.slf4j.Slf4j;
 public class InitializerTest {
 
 	private AtomicBoolean isDBInitialized = new AtomicBoolean(false);
+	private AtomicBoolean isInitStatsInitialized = new AtomicBoolean(false);
 	private AtomicBoolean isCircuitBreakerInitialized = new AtomicBoolean(false);
 	
 	@Test
@@ -85,10 +86,12 @@ public class InitializerTest {
 			.nonMandatoryTask("initStats", () -> {return initStats();})
 			.postInitTask("serveRequests", () -> {return serveRequests();})
 			.failureDelaySeconds(1)
+			.postInitGracePeriodSeconds(1)
 			.build();
 		assertEquals(InitializerStatus.NOT_STARTED, initializer.getStatus());
 		initializer.initAsync();
-		TimeUnit.SECONDS.sleep(3);
+		log.info("Invoked initAsync, pending for results.");
+		TimeUnit.SECONDS.sleep(4);
 		assertEquals(InitializerStatus.SUCCESS, initializer.getStatus());
 		initializer.shutdown();
 		assertEquals(InitializerStatus.CLOSED, initializer.getStatus());
@@ -108,6 +111,10 @@ public class InitializerTest {
 	}
 	
 	private boolean initStats() {
+		if (isInitStatsInitialized.compareAndSet(false, true)) {
+			log.info("Simulating stats down, failing initStats");
+			return false;
+		}
 		return true;
 	}
 	
