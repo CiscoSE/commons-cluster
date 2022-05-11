@@ -1,7 +1,7 @@
 package com.cisco.commons.initializer;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -81,11 +81,11 @@ public class Initializer {
 	private Integer postInitGracePeriodSeconds;
 	private ExecutorService initTasksPool;
 	private ExecutorService mainTaskPool;
-	private Map<String, Callable<Boolean>> mandatoryTasks = new HashMap<>();
+	private Map<String, Callable<Boolean>> mandatoryTasks = new LinkedHashMap<>();
 	private List<Future<Boolean>> mandatoryTasksFutures = new LinkedList<>();
-	private Map<String, Callable<Boolean>> nonMandatoryTasks = new HashMap<>();
+	private Map<String, Callable<Boolean>> nonMandatoryTasks = new LinkedHashMap<>();
 	private List<Future<Boolean>> nonMandatoryTasksFutures = new LinkedList<>();
-	private Map<String, Callable<Boolean>> postInitTasks = new HashMap<>();
+	private Map<String, Callable<Boolean>> postInitTasks = new LinkedHashMap<>();
 	private List<Future<Boolean>> postInitTasksFutures = new LinkedList<>();
 	@Getter private int successfulTasks = 0;
 	private InitializerStatus initializerStatus = InitializerStatus.NOT_STARTED;
