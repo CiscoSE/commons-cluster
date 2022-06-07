@@ -53,7 +53,7 @@ import lombok.extern.slf4j.Slf4j;
  * 
  * @author Liran Mendelovich
  * 
- *  Copyright 2021 Cisco Systems Licensed under the Apache License,
+ * Copyright 2021 Cisco Systems Licensed under the Apache License,
  * Version 2.0 (the "License"); you may not use this file except in
  * compliance with the License. You may obtain a copy of the License at
  * http://www.apache.org/licenses/LICENSE-2.0 Unless required by
@@ -226,20 +226,15 @@ public class Initializer {
     	log.info("Executing action - begin: {}", actionLabel);
     	boolean success = false;
     	while (!success && shouldRun.get()) {
-    		if (circuitBreaker == null || !circuitBreaker.isOpen()) {
-	    		try {
-	    			log.info("Executing action - attempt: {}", actionLabel);
-	                Boolean result = action.call();
-	                if (result.booleanValue()) {
-	                	success = true;
-	                } else {
-	                	log.error("{} result is false.", actionLabel);
-	                }
-	            } catch (Exception e) {
-	                log.error("Error executing action: " + actionLabel + ": " + e.getClass() + ", " + e.getMessage(), e);
-	            }
-    		} else {
+    		boolean considerCircuitBreaker = true;
+    		if (action instanceof Task) {
+    			considerCircuitBreaker = ((Task)action).isConsiderCircuitBreaker();
+    		}
+    		boolean holdAction = considerCircuitBreaker && circuitBreaker != null && circuitBreaker.isOpen();
+    		if (holdAction) {
     			log.info("circuit breaker is open. Holding action: {}", actionLabel);
+    		} else {
+    			success = executeAction(action, actionLabel);
     		}
     		if (!success && shouldRun.get()) {
                 log.info("Delaying {} seconds before retrying action: {}", failureDelaySeconds, actionLabel);
@@ -249,6 +244,22 @@ public class Initializer {
     	log.info("Executing action - end: {}", actionLabel);
     	return success;
     }
+
+	private boolean executeAction(Callable<Boolean> action, String actionLabel) {
+		boolean success = false;
+		try {
+			log.info("Executing action - attempt: {}", actionLabel);
+		    Boolean result = action.call();
+		    if (result.booleanValue()) {
+		    	success = true;
+		    } else {
+		    	log.error("{} result is false.", actionLabel);
+		    }
+		} catch (Exception e) {
+		    log.error("Error executing action: " + actionLabel + ": " + e.getClass() + ", " + e.getMessage(), e);
+		}
+		return success;
+	}
 	
 	public InitializerStatus getStatus() {
 		return initializerStatus;

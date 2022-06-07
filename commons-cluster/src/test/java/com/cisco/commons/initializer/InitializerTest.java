@@ -80,7 +80,12 @@ public class InitializerTest {
 			}
 			
 		};
+		Task preInitTask = Task.builder()
+				.action(() -> {return preInit();})
+				.considerCircuitBreaker(false)
+				.build();
 		Initializer initializer = Initializer.builder().circuitBreaker(circuitBreaker)
+			.mandatoryTask("preInit", preInitTask)
 			.mandatoryTask("initDB", () -> {return initDB();})
 			.mandatoryTask("initMessagingService", () -> {return initMessagingService();})
 			.nonMandatoryTask("initStats", () -> {return initStats();})
@@ -95,7 +100,11 @@ public class InitializerTest {
 		assertEquals(InitializerStatus.SUCCESS, initializer.getStatus());
 		initializer.shutdown();
 		assertEquals(InitializerStatus.CLOSED, initializer.getStatus());
-		assertEquals(4, initializer.getSuccessfulTasks());
+		assertEquals(5, initializer.getSuccessfulTasks());
+	}
+	
+	private Boolean preInit() {
+		return true;
 	}
 
 	private boolean initMessagingService() {
