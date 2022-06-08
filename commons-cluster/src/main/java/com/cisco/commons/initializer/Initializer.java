@@ -275,6 +275,7 @@ public class Initializer {
 	
 	public void shutdown() {
 		log.info("shutdown begin");
+		shouldRun.set(false);
 		ConcurrentUtils.shutdownAndAwaitTermination(initTasksPool, 40);
 		ConcurrentUtils.shutdownAndAwaitTermination(mainTaskPool, 40);
 		initializerStatus = InitializerStatus.CLOSED;
