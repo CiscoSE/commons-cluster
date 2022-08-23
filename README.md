@@ -13,6 +13,12 @@ Provides capabilities for clustering features:
 ### Clustering Introduction
 Provides capabilities for clustering features for managing multiple instances services like Service Discovery and Leader Election, subscribing to instance up/down events, and sending messages to application instances.
 
+### Use cases
+* Active/standby (leader/follower), such that expected one and only one active instance for high availability, with fast leader switch when leader goes down. Only active instance will do the application logic.
+* Connect to multiple nodes - leader can coordinate and split work between the dynamic follower instances.
+* Only leader will do a specific leader logic, other instances will do common logic.
+
+
 ### Implementation
 The library is currently implemented with Curator on top of Apache ZooKeeper.  
 Main purpose is Leader Election algorithm, with eliminating the "herd" effect.  
@@ -26,17 +32,17 @@ There is a plan to make it more generic and add implementation with *etcd*.
 ### Getting Started
 #### Functionality
 * Each service instance registered itself by joining the cluster.
-* Leader elected and starts listening to stateChanged events for added/removed instances.
+* Leader elected and starts listening to stateChangedÂ events for added/removed instances.
 * Consumer can implement event listener with the below methods.
-    * takeLeadership - Called for the leader, when leader is taking leadership.
+    * takeLeadership -Â Called for the leader, when leader is taking leadership.
     When implementing takeLeadership, leadershipLost should normally also be implemented.
-    * leadershipLost - Called for the leader, when leadership is lost when connection suspended or lost.
+    * leadershipLost -Â Called for the leader, when leadership is lost when connection suspended or lost.
     * stateChanged - Called for the leader only, when cluster state changed, for example some instance added or removed.
-    When number of instances equals expectedNumberOfInstances (optional constructor parameter), it is triggered immediately.
+    When number of instances equalsÂ expectedNumberOfInstances (optional constructor parameter), it is triggered immediately.
     Otherwise, it is triggered after a grace period. This is to fine-grain scenarios like herd effect on initial cluster startup when all service instances start together.
     * onMessage - Called for message received, for the target instance.
 
-  takeLeadership(), leadershipLost() and stateChanged() events have no data.
+  takeLeadership(),Â leadershipLost()Â and stateChanged() events have no data.
   The consumer can query getClusterMembers() in the implementation of the event listener and get the needed data.
   Reg. the 'state':
   takeLeadership - occurs only for leader, such as initial cluster startup or leader down and new leader took its place, and only leader listens for stateChanged() events - so "state" is always leader. The meaning, is that possibly other non-leader service instance was added/removed.  
@@ -109,7 +115,7 @@ clusterController.shutdown();
 #### Full test example
 Full unit test is implemented. It is using embedded in-process ZooKeeper server provided by Curator framework.
 
-See ClusterControllerTest class.
+SeeÂ ClusterControllerTest class.
 
 ### ZooKeeper Nodes - CLI
 
@@ -143,7 +149,7 @@ This can be very useful for distributed services, to meet several requirements:
 * Start the service first and report healthy state
 * Initialize mandatory components (database, messaging service etc')
 	* in a background task for not holding service startup.
-	* Retry mechanism – per component, not for all components together.
+	* Retry mechanism â€“ per component, not for all components together.
  * Circuit breaker for retrying for waiting for some cluster state which can hold service initialization.
  * Optional non-mandatory components can be retried and initialized in a background task without holding
    application from starting and serving requests and/or do its work.
